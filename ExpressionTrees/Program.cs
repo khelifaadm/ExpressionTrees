@@ -12,18 +12,19 @@ namespace ExpressionTrees
             var students = new Builder<Student>();
             Console.WriteLine(
             students
-                   .Where(x => x.Age == 10)                 
+                   .Where(x=>x.Age>7)
+                   .AndWhere(x => x.Age < 10)
                    .AndWhere(x => x.FirstName.Contains("ade"))
-                   .Select(x => new { x.FirstName, x.Age })
+                   .Select(x => new { x.FirstName, x.Age,NewField=10 })
             );
-
         }
     }
 
     public class Builder<T> where T : new()
     {
         #region private
-        private readonly List<Expression> _expressionContainer = new List<Expression>();
+        private Expression _expressionRoot;
+        //private readonly List<Expression> _expressionContainer = new List<Expression>();
         private static string _tableName;
 
         private readonly List<ExpressionType> _logicalExpressions = new List<ExpressionType>
@@ -69,39 +70,48 @@ namespace ExpressionTrees
                 var lamdaExpr = (LambdaExpression)expr;
                 if (_logicalExpressions.Contains(lamdaExpr.Body.NodeType))
                 {
-                    var binaryExpr = (BinaryExpression)lamdaExpr.Body;
-                    _expressionContainer.Add(binaryExpr);
+                    _expressionRoot = (BinaryExpression)lamdaExpr.Body;
                 }
                 else
                 if (lamdaExpr.Body.NodeType == ExpressionType.Call)
                 {
-                    var callExpr = (MethodCallExpression)lamdaExpr.Body;
-                    _expressionContainer.Add(callExpr);
+                    _expressionRoot = (MethodCallExpression)lamdaExpr.Body;
                 }
+            }
+            else
+            {
+                throw new ArgumentException($" {typeof(T)} where argument must be lamda given {expr.Body}");
             }
             return this;
         }
 
         public Builder<T> AndWhere(Expression<Func<T, bool>> expr)
         {
-            if (_expressionContainer.Count == 0)
+            if (_expressionRoot == null)
             {
                 throw new Exception("Call Where first");
-            }            
-            _expressionContainer.Add(Expression.AndAlso(_expressionContainer.Last(), expr.Body));
-            
-            Where(expr);
+            }
+
+            _expressionRoot = Expression.AndAlso(_expressionRoot, expr.Body);
+
             return this;
         }
+
+        public Builder<T> OrWhere(Expression<Func<T, bool>> expr)
+        {
+            if (_expressionRoot == null)
+            {
+                throw new Exception("Call Where first");
+            }
+
+            _expressionRoot = Expression.OrElse(_expressionRoot, expr.Body);
+
+            return this;
+        }
+
         public string DumpWhere()
         {
-            var result = string.Empty;
-            int indexCombine = 0;
-            foreach (var expr in _expressionContainer)
-            {
-                result += $"({Parse(expr)}) ";           
-            }
-            return result;
+            return $"({Parse(_expressionRoot)}) ";
         }
 
         private string Parse(Expression expr)
@@ -110,74 +120,80 @@ namespace ExpressionTrees
             {
                 var logicalSymbol = _logicalSymbol[_logicalExpressions.IndexOf(expr.NodeType)];
                 var exprCast = (BinaryExpression)expr;
-                return $"{Parse(exprCast.Left)} {logicalSymbol} {Parse(exprCast.Right)}";
+                return $"{Parse(exprCast.Left)}{logicalSymbol}{Parse(exprCast.Right)}";
             }
-            else if (expr.NodeType == ExpressionType.Constant)
-            {
-                var exprCast = (ConstantExpression)expr;
-                if (exprCast.Type == typeof(string))
+            else switch (expr.NodeType)
                 {
-                    return $"\"{exprCast.Value}\"";
-}
-                return $"{exprCast.Value}";
-            }
-            else if (expr.NodeType == ExpressionType.AndAlso)
-            {
-                
-                var exprCast = (BinaryExpression)expr;
-                
-                return $" {Parse(exprCast.Left)} and {Parse(exprCast.Right)} ";
-            }
-            else if (expr.NodeType == ExpressionType.MemberAccess)
-            {
-                var exprCast = (MemberExpression)expr;
-                return $" {exprCast.Member.Name} ";
-            }
-            else if (expr.NodeType == ExpressionType.AndAlso)
-            {
-                var exprCast = (MemberExpression)expr;
-                return $" and  ";
-            }
-            if (expr.NodeType == ExpressionType.Call)
-            {
-                var exprCast = (MethodCallExpression)expr;
-                string result = $"{Parse(exprCast.Object)} " + $"{exprCast.Method.Name} ";
+                    case ExpressionType.Constant:
+                        {
+                            var exprCast = (ConstantExpression)expr;
+                            if (exprCast.Type == typeof(string))
+                            {
+                                return $"\"{exprCast.Value}\"";
+                            }
+                            return $"{exprCast.Value}";
+                        }
 
+                    case ExpressionType.AndAlso:
+                        {
+                            var exprCast = (BinaryExpression)expr;
+                            return $"({Parse(exprCast.Left)}) and ({Parse(exprCast.Right)})";
+                        }
+                    case ExpressionType.OrElse:
+                        {
+                            var exprCast = (BinaryExpression)expr;
+                            return $" ({Parse(exprCast.Left)}) or({Parse(exprCast.Right)}) ";
+                        }
+                    case ExpressionType.MemberAccess:
+                        {
+                            var exprCast = (MemberExpression)expr;
+                            return $" {exprCast.Member.Name} ";
+                        }
+                    case ExpressionType.Call:
+                        {
+                            var exprCast = (MethodCallExpression)expr;
+                            string result = $"{Parse(exprCast.Object)} " + $"{exprCast.Method.Name} ";
 
-                if (exprCast.Arguments.Count == 1)
-                {
-                    result += Parse(exprCast.Arguments[0]);
+                            if (exprCast.Arguments.Count == 1)
+                            {
+                                result += Parse(exprCast.Arguments[0]);
+                            }
+                            else
+                                foreach (var arg in exprCast.Arguments)
+                                {
+                                    result += Parse(arg) + ",";
+                                }
+                            
+                            return result;
+                        }
                 }
-                else
-                    foreach (var arg in exprCast.Arguments)
-                    {
-                        result += Parse(arg) + ",";
-                    }
-                result += ") ";
-                return result;
-
-            }
             return null;
         }
 
         internal string Select(Expression<Func<T, object>> expr)
         {
-            string result = $"SELECT From {_tableName} ";
-            result += Environment.NewLine;
-
-
+            string result = $"SELECT ";
             if (expr.Body.NodeType == ExpressionType.New)
             {
                 var newExpr = (NewExpression)expr.Body;
-                foreach (var item in newExpr.Arguments)
+                for (int i = 0; i < newExpr.Members.Count; i++)
                 {
-                    var memExpr = (MemberExpression)item;
-                    result += $"{memExpr.Member.Name},";
+                    var memInfo = newExpr.Members[i];
+                    var argExpr = newExpr.Arguments[i];
+                    if (argExpr.NodeType == ExpressionType.Constant)
+                    {
+                        var conExpr = (ConstantExpression)argExpr;
+                    result += $"{conExpr.Value} as {memInfo.Name},";
+                    }
+                    else
+                    {
+                        result += $"{memInfo.Name},";
+                    }
                 }
                 result = result.Remove(result.Length - 1);
             }
-            result += Environment.NewLine;
-            result += $"Where {DumpWhere()}";
+            result += Environment.NewLine + $"From {_tableName} ";
+            result += Environment.NewLine + $"Where {DumpWhere()}";
             return result;
         }
     }
@@ -187,7 +203,6 @@ namespace ExpressionTrees
     {
         public Student()
         {
-
         }
 
         public Student(int id)
