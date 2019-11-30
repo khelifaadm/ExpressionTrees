@@ -8,12 +8,11 @@ namespace ExpressionTrees
     {
         private static void Main(string[] args)
         {
-            var list = new List<Student>().AsQueryable().Where(x => x.Age > 10);            
+            var list = new List<Student>().AsQueryable().Where(x => x.Age > 10);
             var students = new Builder<Student>();
             Console.WriteLine(
             students
-                   .Where(x => x.Age == 10)
-                   .OrWhere(x => x.FirstName == "khelifa")
+                   .Where(x => x.Age == 10)                 
                    .AndWhere(x => x.FirstName.Contains("ade"))
                    .Select(x => new { x.FirstName, x.Age })
             );
@@ -23,10 +22,10 @@ namespace ExpressionTrees
 
     public class Builder<T> where T : new()
     {
-
         #region private
         private readonly List<Expression> _expressionContainer = new List<Expression>();
         private static string _tableName;
+
         private readonly List<ExpressionType> _logicalExpressions = new List<ExpressionType>
         {
             ExpressionType.GreaterThan,
@@ -36,6 +35,7 @@ namespace ExpressionTrees
             ExpressionType.Equal,
             ExpressionType.NotEqual,
         };
+
         private readonly List<string> _logicalSymbol = new List<string>
         {
             ">",
@@ -45,11 +45,6 @@ namespace ExpressionTrees
             "=",
             "<>",
         };
-        public enum CombineOperator{
-            And,
-            Or
-        }
-        private List<CombineOperator> _combineOperators = new List<CombineOperator>();
 
         #endregion
 
@@ -57,6 +52,7 @@ namespace ExpressionTrees
         {
             _tableName = $"{typeof(T).Name}s";
         }
+
         public Builder<T> From(string tableName = null)
         {
             if (!string.IsNullOrEmpty(tableName))
@@ -64,7 +60,7 @@ namespace ExpressionTrees
                 _tableName = tableName;
             }
             return this;
-        }     
+        }
 
         public Builder<T> Where(Expression<Func<T, bool>> expr)
         {
@@ -92,44 +88,18 @@ namespace ExpressionTrees
             {
                 throw new Exception("Call Where first");
             }            
-            _combineOperators.Add(CombineOperator.And);
+            _expressionContainer.Add(Expression.AndAlso(_expressionContainer.Last(), expr.Body));
+            
             Where(expr);
             return this;
         }
-
-        public Builder<T> OrWhere(Expression<Func<T, bool>> expr)
-        {
-            if (_expressionContainer.Count == 0)
-            {
-                throw new Exception("Call Where first");
-            }
-            _combineOperators.Add(CombineOperator.Or);
-            Where(expr);
-            return this;
-        }
-
         public string DumpWhere()
         {
             var result = string.Empty;
             int indexCombine = 0;
             foreach (var expr in _expressionContainer)
             {
-                result += $"({Parse(expr)}) ";
-                if (_combineOperators.Count > indexCombine)
-                {
-                    switch (_combineOperators[indexCombine])
-                    {
-                        case CombineOperator.And:
-                            result += " And ";
-                            break;
-                        case CombineOperator.Or:
-                            result += " or ";
-                            break;
-                        default:
-                            throw new ArgumentException(_combineOperators[indexCombine].ToString() + " not implimented combine ");
-                    }
-                    indexCombine++;
-                }
+                result += $"({Parse(expr)}) ";           
             }
             return result;
         }
@@ -139,7 +109,7 @@ namespace ExpressionTrees
             if (_logicalExpressions.Contains(expr.NodeType))
             {
                 var logicalSymbol = _logicalSymbol[_logicalExpressions.IndexOf(expr.NodeType)];
-                var exprCast = (BinaryExpression)expr;                
+                var exprCast = (BinaryExpression)expr;
                 return $"{Parse(exprCast.Left)} {logicalSymbol} {Parse(exprCast.Right)}";
             }
             else if (expr.NodeType == ExpressionType.Constant)
@@ -147,17 +117,23 @@ namespace ExpressionTrees
                 var exprCast = (ConstantExpression)expr;
                 if (exprCast.Type == typeof(string))
                 {
-                return $"\"{exprCast.Value}\"";
-
-                }
+                    return $"\"{exprCast.Value}\"";
+}
                 return $"{exprCast.Value}";
+            }
+            else if (expr.NodeType == ExpressionType.AndAlso)
+            {
+                
+                var exprCast = (BinaryExpression)expr;
+                
+                return $" {Parse(exprCast.Left)} and {Parse(exprCast.Right)} ";
             }
             else if (expr.NodeType == ExpressionType.MemberAccess)
             {
                 var exprCast = (MemberExpression)expr;
                 return $" {exprCast.Member.Name} ";
             }
-            else if (expr.NodeType == ExpressionType.And)
+            else if (expr.NodeType == ExpressionType.AndAlso)
             {
                 var exprCast = (MemberExpression)expr;
                 return $" and  ";
@@ -195,10 +171,10 @@ namespace ExpressionTrees
                 var newExpr = (NewExpression)expr.Body;
                 foreach (var item in newExpr.Arguments)
                 {
-                    var memExpr =(MemberExpression) item;
+                    var memExpr = (MemberExpression)item;
                     result += $"{memExpr.Member.Name},";
                 }
-                result = result.Remove( result.Length - 1);
+                result = result.Remove(result.Length - 1);
             }
             result += Environment.NewLine;
             result += $"Where {DumpWhere()}";
@@ -232,6 +208,6 @@ namespace ExpressionTrees
     {
         Male,
         Female
-    } 
+    }
     #endregion
 }
