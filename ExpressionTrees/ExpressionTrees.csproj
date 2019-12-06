@@ -41,6 +41,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Descriptor\DescriptionValueItem.cs" />
+    <Compile Include="Descriptor\FieldDescriptorOneValue.cs" />
+    <Compile Include="Descriptor\FieldDescriptorRadioValue.cs" />
+    <Compile Include="Descriptor\ValueType.cs" />
+    <Compile Include="Descriptor\FieldDesriptorBase.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="QueryBuilder.cs" />
