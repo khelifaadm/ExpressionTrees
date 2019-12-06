@@ -7,7 +7,7 @@ namespace ExpressionTrees.Descriptor
 {
     public class FieldDescriptorOneValue : FieldDesriptorBase
     {
-        protected FieldDescriptorOneValue(string name, string description, object fieldValue) : base(name, description, ValueType.OneValue, fieldValue)
+        public FieldDescriptorOneValue(string name, string description, object fieldValue) : base(name, description, ValueType.OneValue, fieldValue)
         {
         }
     }

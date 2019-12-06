@@ -8,7 +8,7 @@ namespace ExpressionTrees.Descriptor
 
     public class FieldDescriptorRadioValue : FieldDesriptorBase
     {
-        protected FieldDescriptorRadioValue(string name, string description, string fieldValue) : base(name, description, ValueType.RadioValue, fieldValue)
+        public FieldDescriptorRadioValue(string name, string description, string fieldValue) : base(name, description, ValueType.RadioValue, fieldValue)
         {
             FieldValues = new List<DescriptionValueItem>();
         }

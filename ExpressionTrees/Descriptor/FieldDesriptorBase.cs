@@ -8,7 +8,7 @@ namespace ExpressionTrees.Descriptor
 
     public abstract class FieldDesriptorBase
     {
-        protected FieldDesriptorBase(string name, string description, ValueType fieldType, object fieldValue)
+        public FieldDesriptorBase(string name, string description, ValueType fieldType, object fieldValue)
         {
             Name = name ?? throw new ArgumentNullException(nameof(name));
             Description = description ?? throw new ArgumentNullException(nameof(description));
